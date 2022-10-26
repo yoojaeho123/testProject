@@ -1,0 +1,199 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper
+	namespace="egovframework.example.sample.service.impl.MyMapper">
+
+	<!-- 게시판 조회 -->
+	<select id="selectBoardList"
+		resultType="egovframework.example.sample.vo.BoardVO">
+
+		SELECT
+
+		id,
+		concat(repeat('[RE] ',level::int)||title) title,
+		writer,
+		content,
+		TO_CHAR(date, 'YYYY.MM.DD') as date,
+		level,
+		pid,
+		count 
+		
+		FROM test.tb_board
+		<if test="keyWord != null and searchType == 'all'">
+			WHERE title like concat('%', #{keyWord}, '%') or writer like concat('%', #{keyWord}, '%')
+		</if>
+		<if test="keyWord != null and searchType == 'title'">
+			WHERE title like concat('%', #{keyWord}, '%')
+		</if>
+		<if test="keyWord != null and searchType == 'writer'">
+			WHERE writer like concat('%', #{keyWord}, '%')
+		</if>
+		order by pid, level, count desc 
+		OFFSET (#{pageNum}::numeric-1)*10 LIMIT #{amount}
+
+	</select>
+	
+	
+	<!-- 게시물 pid 업데이트 -->
+	<update id="updateBoardId">
+		
+		UPDATE test.tb_board set pid = id where level = 0 and count = 0
+	
+	</update>
+
+
+
+	<!-- 게시물 총 개수 -->
+	<select id="getTotal" resultType="int">
+
+		SELECT count(*) FROM test.tb_board
+		<if test="keyWord != null and searchType == 'all'">
+			WHERE title like concat('%', #{keyWord}, '%') or writer like concat('%', #{keyWord}, '%')
+		</if>
+		<if test="keyWord != null and searchType == 'title'">
+			WHERE title like concat('%', #{keyWord}, '%')
+		</if>
+		<if test="keyWord != null and searchType == 'writer'">
+			WHERE writer like concat('%', #{keyWord}, '%')
+		</if>
+		
+		
+	</select>
+
+	<!-- 게시물 작성 -->
+	<insert id="insertBoard"
+		parameterType="egovframework.example.sample.vo.BoardVO">
+
+		INSERT INTO test.tb_board
+		(
+
+		title,
+		writer,
+		content,
+		date,
+		level,
+		pid,
+		count
+
+		)values
+		(
+
+		#{title},
+		#{writer},
+		#{content},
+		current_timestamp,
+		'0',
+		'0',
+		'0'
+
+		)
+	</insert>
+
+	<!-- 상세페이지 조회 -->
+	<select id="selectDetail" resultType="egovframework.example.sample.vo.BoardVO">
+		SELECT
+
+		id,
+		title,
+		writer,
+		content,
+		TO_CHAR(date, 'YYYY.MM.DD') as date,
+		level,
+		pid,
+		count
+
+		FROM test.tb_board
+		where id = #{id}
+	</select>
+
+	<!-- 게시물 삭제 -->
+	<delete id="deleteBoard">
+		DELETE FROM test.tb_board where id = #{id}
+
+	</delete>
+
+	<!-- 게시물 수정 -->
+	<update id="updateBoard">
+		UPDATE test.tb_board
+		set
+		title = #{title},
+		content = #{content},
+		writer = #{writer}
+		where id = #{id}
+
+	</update>
+	<!-- 답글게시판 작성 부분 -->
+	<update id="updateReWrite">
+	
+		UPDATE test.tb_board 
+			set pid = #{pid}
+			<choose>
+				<when test="level == 0 and count ==0">
+				,level = level + 1, count = (SELECT MAX(count) FROM test.tb_board where pid = #{pid}) + 1
+				</when>
+				<when test="level == 0 and count gte 1">
+				,level = #{level}, count = (SELECT MAX(count) FROM test.tb_board where pid = #{pid}) + 1
+				</when>
+			</choose>
+			
+		where id = (SELECT MAX(id) FROM test.tb_board)
+	
+	</update> 
+	
+	<update id="updateReWriteTrue">
+		UPDATE test.tb_board 
+			set pid = #{pid}
+			,level = #{level}+1 , count = (SELECT MAX(count) FROM test.tb_board where pid = #{pid} and level = #{level}) + 1
+			where id = (SELECT MAX(id) FROM test.tb_board)
+	</update>
+	
+	<update id="updateReWriteFalse">
+		UPDATE test.tb_board 
+			set pid = #{pid}
+			,level = (SELECT MAX(level) FROM test.tb_board where pid = #{pid}) + 1, count = count + 1
+			where id = (SELECT MAX(id) FROM test.tb_board)
+	</update>
+	
+	<select id="selectLevel" resultType="boolean">
+		SELECT exists(select * from test.tb_board where pid = #{pid} and level = #{level}+1)
+	
+	</select>
+	
+	<!-- 댓글 출력 -->
+	<select id="selectComment" parameterType="egovframework.example.sample.vo.BoardVO" resultType="egovframework.example.sample.vo.CommentVO">
+		SELECT 
+		id,
+		writer,
+		content,
+		TO_CHAR(date, 'YYYY.MM.DD') as date
+		
+		from test.tb_board_comment
+		where bid = #{id}
+	
+	</select>
+	
+	<!-- 댓글 작성 -->
+	<insert id="insertComment" parameterType="Map">
+
+		INSERT INTO test.tb_board_comment
+		(
+
+		writer,
+		content,
+		date,
+		bid
+		
+		)values
+		(
+
+		#{writer},
+		#{content},
+		current_timestamp,
+		#{id}
+		
+		)
+	</insert>
+
+
+
+</mapper>
